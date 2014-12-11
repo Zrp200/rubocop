@@ -6,12 +6,9 @@ $LOAD_PATH.unshift(File.dirname(File.realpath(__FILE__)) + '/../lib')
 require 'rubocop'
 require 'benchmark'
 
-cli = RuboCop::CLI.new
-result = 0
+cli, result = RuboCop::CLI.new, 0
 
-time = Benchmark.realtime do
-  result = cli.run
-end
+time = Benchmark.realtime {result = cli.run}
 
 puts "Finished in #{time} seconds" if cli.options[:debug]
 exit result
