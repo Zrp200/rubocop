@@ -2,6 +2,27 @@
 
 ## master (unreleased)
 
+### New features
+
+* [#1430](https://github.com/bbatsov/rubocop/issues/1430): Add `--except` option for disabling cops on the command line. ([@jonas054][])
+* [#1506](https://github.com/bbatsov/rubocop/pull/1506): Add auto-correct from `EvenOdd` cop. ([@blainesch][])
+* [#1507](https://github.com/bbatsov/rubocop/issues/1507): `Debugger` cop now checks for the Capybara debug methods `save_and_open_page` and `save_and_open_screenshot`. ([@rrosenblum][])
+
+### Changes
+
+* [#1492](https://github.com/bbatsov/rubocop/pull/1492): Abort when auto-correct causes an infinite loop. ([@dblock][])
+
+### Bugs fixed
+
+* Handle element assignment in `Lint/AssignmentInCondition`. ([@jonas054][])
+* [#1484](https://github.com/bbatsov/rubocop/issues/1484): Fix `EmptyLinesAroundAccessModifier` incorrectly finding a violation inside method calls with names identical to an access modifier. ([@dblock][])
+* Fix bug concerning `Exclude` properties inherited from a higher directory level. ([@jonas054][])
+* [#1500](https://github.com/bbatsov/rubocop/issues/1500): Fix crashing `--auto-correct --only IndentationWidth`. ([@jonas054][])
+* [#1512](https://github.com/bbatsov/rubocop/issues/1512): Fix false negative for typical string formatting examples. ([@kakutani][], [@jonas054][])
+* [#1504](https://github.com/bbatsov/rubocop/issues/1504): Fail with a meaningful error if the configuration file is malformed. ([@bquorning][])
+* Fix bug where `auto_correct` Rake tasks does not take in the options specified in its parent task. ([@rrosenblum][])
+* [#1054](https://github.com/bbatsov/rubocop/issues/1054): Handle comments within concatenated strings in `LineEndConcatenation`. ([@yujinakayama][], [@jonas054][])
+
 ## 0.28.0 (10/12/2014)
 
 ### New features
@@ -1190,3 +1211,5 @@
 [@blainesch]: https://github.com/blainesch
 [@marxarelli]: https://github.com/marxarelli
 [@katieschilling]: https://github.com/katieschilling
+[@kakutani]: https://github.com/kakutani
+[@rrosenblum]: https://github.com/rrosenblum

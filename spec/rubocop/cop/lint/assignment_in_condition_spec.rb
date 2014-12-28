@@ -62,6 +62,14 @@ describe RuboCop::Cop::Lint::AssignmentInCondition, :config do
     expect(cop.offenses.size).to eq(1)
   end
 
+  it 'registers an offense for collection element assignment in condition' do
+    inspect_source(cop,
+                   ['if a[3] = 10',
+                    'end'
+                   ])
+    expect(cop.offenses.size).to eq(1)
+  end
+
   it 'accepts == in condition' do
     inspect_source(cop,
                    ['if test == 10',
@@ -72,13 +80,13 @@ describe RuboCop::Cop::Lint::AssignmentInCondition, :config do
 
   it 'accepts = in a block that is called in a condition' do
     inspect_source(cop,
-                   ['return 1 if any_errors? { o = inspect(file) }'])
+                   'return 1 if any_errors? { o = inspect(file) }')
     expect(cop.offenses).to be_empty
   end
 
   it 'accepts ||= in condition' do
     inspect_source(cop,
-                   ['raise StandardError unless foo ||= bar'])
+                   'raise StandardError unless foo ||= bar')
     expect(cop.offenses).to be_empty
   end
 
@@ -90,14 +98,30 @@ describe RuboCop::Cop::Lint::AssignmentInCondition, :config do
                      ])
       expect(cop.offenses).to be_empty
     end
+
+    it 'accepts []= in condition surrounded with braces' do
+      inspect_source(cop,
+                     ['if (test[0] = 10)',
+                      'end'
+                     ])
+      expect(cop.offenses).to be_empty
+    end
   end
 
   context 'safe assignment is not allowed' do
     let(:cop_config) { { 'AllowSafeAssignment' => false } }
 
-    it 'does not accepts = in condition surrounded with braces' do
+    it 'does not accept = in condition surrounded with braces' do
       inspect_source(cop,
                      ['if (test = 10)',
+                      'end'
+                     ])
+      expect(cop.offenses.size).to eq(1)
+    end
+
+    it 'does not accept []= in condition surrounded with braces' do
+      inspect_source(cop,
+                     ['if (test[0] = 10)',
                       'end'
                      ])
       expect(cop.offenses.size).to eq(1)

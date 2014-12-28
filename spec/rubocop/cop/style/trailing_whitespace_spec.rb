@@ -6,13 +6,13 @@ describe RuboCop::Cop::Style::TrailingWhitespace do
   subject(:cop) { described_class.new }
 
   it 'registers an offense for a line ending with space' do
-    source = ['x = 0 ']
+    source = 'x = 0 '
     inspect_source(cop, source)
     expect(cop.offenses.size).to eq(1)
   end
 
   it 'registers an offense for a line ending with tab' do
-    inspect_source(cop, ["x = 0\t"])
+    inspect_source(cop, "x = 0\t")
     expect(cop.offenses.size).to eq(1)
   end
 

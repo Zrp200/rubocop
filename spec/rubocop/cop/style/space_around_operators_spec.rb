@@ -6,9 +6,11 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   subject(:cop) { described_class.new }
 
   it 'registers an offense for assignment without space on both sides' do
-    inspect_source(cop, ['x=0', 'y= 0', 'z =0'])
-    expect(cop.messages).to eq(
-      ["Surrounding space missing for operator '='."] * 3)
+    inspect_source(cop, ['x=0', 'y+= 0', 'z[0] =0'])
+    expect(cop.messages)
+      .to eq(["Surrounding space missing for operator '='.",
+              "Surrounding space missing for operator '+='.",
+              "Surrounding space missing for operator '='."])
   end
 
   it 'auto-corrects assignment without space on both sides' do
@@ -17,7 +19,7 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'registers an offense for ternary operator without space' do
-    inspect_source(cop, ['x == 0?1:2'])
+    inspect_source(cop, 'x == 0?1:2')
     expect(cop.messages).to eq(
       ["Surrounding space missing for operator '?'.",
        "Surrounding space missing for operator ':'."])
@@ -71,7 +73,7 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'registers an offense for arguments to a method' do
-    inspect_source(cop, ['puts 1+2'])
+    inspect_source(cop, 'puts 1+2')
     expect(cop.messages).to eq(
       ["Surrounding space missing for operator '+'."])
   end
@@ -82,34 +84,34 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'accepts operator surrounded by tabs' do
-    inspect_source(cop, ["a\t+\tb"])
+    inspect_source(cop, "a\t+\tb")
     expect(cop.messages).to be_empty
   end
 
   it 'accepts operator symbols' do
-    inspect_source(cop, ['func(:-)'])
+    inspect_source(cop, 'func(:-)')
     expect(cop.messages).to be_empty
   end
 
   it 'accepts ranges' do
-    inspect_source(cop, ['a, b = (1..2), (1...3)'])
+    inspect_source(cop, 'a, b = (1..2), (1...3)')
     expect(cop.messages).to be_empty
   end
 
   it 'accepts scope operator' do
-    source = ['@io.class == Zlib::GzipWriter']
+    source = '@io.class == Zlib::GzipWriter'
     inspect_source(cop, source)
     expect(cop.messages).to be_empty
   end
 
   it 'accepts ::Kernel::raise' do
-    source = ['::Kernel::raise IllegalBlockError.new']
+    source = '::Kernel::raise IllegalBlockError.new'
     inspect_source(cop, source)
     expect(cop.messages).to be_empty
   end
 
   it 'accepts exclamation point negation' do
-    inspect_source(cop, ['x = !a&&!b'])
+    inspect_source(cop, 'x = !a&&!b')
     expect(cop.messages).to eq(
       ["Surrounding space missing for operator '&&'."])
   end
@@ -143,7 +145,7 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'accepts splat operator' do
-    inspect_source(cop, ['return *list if options'])
+    inspect_source(cop, 'return *list if options')
     expect(cop.messages).to be_empty
   end
 
@@ -161,12 +163,12 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'accepts an assignment with spaces' do
-    inspect_source(cop, ['x = 0'])
+    inspect_source(cop, 'x = 0')
     expect(cop.offenses).to be_empty
   end
 
   it 'accepts an operator called with method syntax' do
-    inspect_source(cop, ['Date.today.+(1).to_s'])
+    inspect_source(cop, 'Date.today.+(1).to_s')
     expect(cop.offenses).to be_empty
   end
 
@@ -216,7 +218,7 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'registers an offenses for exponent operator with spaces' do
-    inspect_source(cop, ['x = a * b ** 2'])
+    inspect_source(cop, 'x = a * b ** 2')
     expect(cop.messages).to eq(
       ['Space around operator ** detected.'])
   end
@@ -229,18 +231,18 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'accepts exponent operator without spaces' do
-    inspect_source(cop, ['x = a * b**2'])
+    inspect_source(cop, 'x = a * b**2')
     expect(cop.offenses).to be_empty
   end
 
   it 'registers an offense for a setter call without spaces' do
-    inspect_source(cop, ['x.y=2'])
+    inspect_source(cop, 'x.y=2')
     expect(cop.messages).to eq(
       ["Surrounding space missing for operator '='."])
   end
 
   it 'registers an offense for a hash rocket without spaces' do
-    inspect_source(cop, ['{ 1=>2, a: b }'])
+    inspect_source(cop, '{ 1=>2, a: b }')
     expect(cop.messages).to eq(
       ["Surrounding space missing for operator '=>'."])
   end
@@ -255,7 +257,7 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'accepts [] without space' do
-    inspect_source(cop, ['files[2]'])
+    inspect_source(cop, 'files[2]')
     expect(cop.messages).to eq([])
   end
 
@@ -275,7 +277,8 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'registers an offense for match operators without space' do
-    inspect_source(cop, ['x=~/abc/', 'y !~/abc/'])
+    inspect_source(cop, ['x=~/abc/',
+                         'y !~/abc/'])
     expect(cop.messages)
       .to eq(["Surrounding space missing for operator '=~'.",
               "Surrounding space missing for operator '!~'."])
@@ -305,7 +308,7 @@ describe RuboCop::Cop::Style::SpaceAroundOperators do
   end
 
   it 'registers an offense for - without space with negative lhs operand' do
-    inspect_source(cop, ['-1-arg'])
+    inspect_source(cop, '-1-arg')
     expect(cop.messages)
       .to eq(["Surrounding space missing for operator '-'."])
   end

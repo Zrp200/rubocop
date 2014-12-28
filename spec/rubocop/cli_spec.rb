@@ -47,6 +47,57 @@ describe RuboCop::CLI, :isolated_environment do
         expect(uncorrected).to be_empty # Hence exit code 0.
       end
 
+      it 'corrects only IndentationWidth without crashing' do
+        source = ['foo = if bar',
+                  '  something',
+                  'elsif baz',
+                  '  other_thing',
+                  'else',
+                  '  fail',
+                  'end']
+        create_file('example.rb', source)
+        expect(cli.run([%w(--only IndentationWidth --auto-correct)])).to eq(0)
+        corrected = ['foo = if bar',
+                     '        something',
+                     'elsif baz',
+                     '  other_thing',
+                     'else',
+                     '  fail',
+                     'end',
+                     ''].join("\n")
+        expect(IO.read('example.rb')).to eq(corrected)
+      end
+
+      it 'crashes on infinite loop but prints offenses' do
+        create_file('example.rb', '3.times{ something;other_thing;}')
+        # This configuration makes --auto-correct impossible to finish since a
+        # space will be added after each ; but then removed again for the one
+        # that's inside }.
+        create_file('.rubocop.yml', ['SpaceInsideBlockBraces:',
+                                     '  EnforcedStyle: no_space',
+                                     '  SpaceBeforeBlockParameters: false'])
+        cmd = %w(--only SpaceAfterSemicolon,SpaceInsideBlockBraces
+                 --auto-correct --format simple)
+        expect { cli.run(cmd) }.to raise_error(RuboCop::Runner::
+                                               InfiniteCorrectionLoop)
+        expect(IO.read('example.rb'))
+          .to eq("3.times{something; other_thing;}\n")
+
+        expected_output = [
+          '== example.rb ==',
+          'C:  1:  9: [Corrected] Space inside { detected.',
+          'C:  1: 19: [Corrected] Space missing after semicolon.',
+          'C:  1: 31: [Corrected] Space missing after semicolon.',
+          'C:  1: 32: [Corrected] Space inside } detected.',
+          'C:  1: 33: [Corrected] Space inside } detected.',
+          '',
+          # We're interrupted during inspection, hence 0 files inspected.
+          '0 files inspected, 5 offenses detected, 5 offenses corrected',
+          ''
+        ]
+        expect($stdout.string).to eq(expected_output.join("\n"))
+      end
+
       it 'corrects complicated cases conservatively' do
         # Two cops make corrections here; Style/BracesAroundHashParameters, and
         # Style/AlignHash. Because they make minimal corrections relating only
@@ -976,6 +1027,79 @@ describe RuboCop::CLI, :isolated_environment do
       end
     end
 
+    describe '--except' do
+      context 'when two cops are given' do
+        it 'runs all cops except the given' do
+          create_file('example.rb', ['if x== 0 ',
+                                     "\ty",
+                                     'end'])
+          expect(cli.run(['--format', 'offenses',
+                          '--except', 'Style/IfUnlessModifier,Style/Tab',
+                          'example.rb'])).to eq(1)
+          expect($stdout.string)
+            .to eq(['',
+                    '1  Style/IndentationWidth',
+                    '1  Style/SpaceAroundOperators',
+                    '1  Style/TrailingWhitespace',
+                    '--',
+                    '3  Total',
+                    '',
+                    ''].join("\n"))
+        end
+
+        it 'exits with error if an incorrect cop name is passed' do
+          create_file('example.rb', ['if x== 0 ',
+                                     "\ty",
+                                     'end'])
+          expect(cli.run(['--except', 'Style/123'])).to eq(1)
+          expect($stderr.string).to include('Unrecognized cop name: Style/123.')
+        end
+
+        context 'when one cop is given without namespace' do
+          it 'disables the given cop' do
+            create_file('example.rb', ['if x== 0 ',
+                                       "\ty",
+                                       'end'])
+
+            cli.run(['--format', 'offenses',
+                     '--except', 'IfUnlessModifier',
+                     'example.rb'])
+            with_option = $stdout.string
+            $stdout = StringIO.new
+            cli.run(['--format', 'offenses',
+                     'example.rb'])
+            without_option = $stdout.string
+
+            expect(without_option.split($RS) - with_option.split($RS))
+              .to eq(['1  Style/IfUnlessModifier', '5  Total'])
+          end
+        end
+      end
+
+      context 'when several cops are given' do
+        it 'disables the given cops' do
+          create_file('example.rb', ['if x== 100000000000000 ',
+                                     "\ty",
+                                     'end'])
+          expect(cli.run(['--format', 'offenses',
+                          '--except',
+                          'Style/IfUnlessModifier,Style/Tab,' \
+                          'Style/SpaceAroundOperators',
+                          'example.rb'])).to eq(1)
+          expect($stderr.string).to eq('')
+          expect($stdout.string)
+            .to eq(['',
+                    '1  Style/IndentationWidth',
+                    '1  Style/NumericLiterals',
+                    '1  Style/TrailingWhitespace',
+                    '--',
+                    '3  Total',
+                    '',
+                    ''].join("\n"))
+        end
+      end
+    end
+
     describe '--lint' do
       it 'runs only lint cops' do
         create_file('example.rb', ['if 0 ',
@@ -1280,6 +1404,16 @@ describe RuboCop::CLI, :isolated_environment do
               .to exit_with_code(1)
             expect($stderr.string)
               .to include('No formatter for "unknown"')
+          end
+        end
+
+        context 'when ambiguous format name is specified' do
+          it 'aborts with error message' do
+            # Both 'files' and 'fuubar' start with an 'f'.
+            expect { cli.run(['--format', 'f', 'example.rb']) }
+              .to exit_with_code(1)
+            expect($stderr.string)
+              .to include('Cannot determine formatter for "f"')
           end
         end
       end
@@ -2419,6 +2553,20 @@ describe RuboCop::CLI, :isolated_environment do
           .to eq(['Attention: rubocop-todo.yml has been renamed to ' \
                   '.rubocop_todo.yml',
                   ''].join("\n"))
+      end
+    end
+
+    context 'when a file inherits from a higher level' do
+      before do
+        create_file('.rubocop.yml', ['Metrics/LineLength:',
+                                     '  Exclude:',
+                                     '    - dir/example.rb'])
+        create_file('dir/.rubocop.yml', 'inherit_from: ../.rubocop.yml')
+        create_file('dir/example.rb', '#' * 90)
+      end
+
+      it 'inherits relative excludes correctly' do
+        expect(cli.run([])).to eq(0)
       end
     end
   end

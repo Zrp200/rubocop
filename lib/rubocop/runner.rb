@@ -4,6 +4,17 @@ module RuboCop
   # This class handles the processing of files, which includes dealing with
   # formatters and letting cops inspect the files.
   class Runner
+    # An exception indicating that the inspection loop got stuck correcting
+    # offenses back and forth.
+    class InfiniteCorrectionLoop < Exception
+      attr_reader :offenses
+
+      def initialize(path, offenses)
+        super "Infinite loop detected in #{path}."
+        @offenses = offenses
+      end
+    end
+
     attr_reader :errors, :aborting
     alias_method :aborting?, :aborting
 
@@ -30,10 +41,10 @@ module RuboCop
         break if @options[:fail_fast] && !all_passed
       end
 
+      all_passed
+    ensure
       formatter_set.finished(inspected_files.freeze)
       formatter_set.close_output_files
-
-      all_passed
     end
 
     def abort
@@ -58,32 +69,55 @@ module RuboCop
       offenses = do_inspection_loop(file, processed_source)
 
       formatter_set.file_finished(file, offenses.compact.sort.freeze)
+
       offenses
+    rescue InfiniteCorrectionLoop => e
+      formatter_set.file_finished(file, e.offenses.compact.sort.freeze)
+      raise
     end
 
     def do_inspection_loop(file, processed_source)
       offenses = []
+
+      # Keep track of the state of the source. If a cop modifies the source
+      # and another cop undoes it producing identical source we have an
+      # infinite loop.
+      @processed_sources = []
 
       # When running with --auto-correct, we need to inspect the file (which
       # includes writing a corrected version of it) until no more corrections
       # are made. This is because automatic corrections can introduce new
       # offenses. In the normal case the loop is only executed once.
       loop do
+        check_for_infinite_loop(processed_source, offenses)
+
         # The offenses that couldn't be corrected will be found again so we
         # only keep the corrected ones in order to avoid duplicate reporting.
         offenses.select!(&:corrected?)
-
         new_offenses, updated_source_file = inspect_file(processed_source)
         offenses.concat(new_offenses).uniq!
-        break unless updated_source_file
 
         # We have to reprocess the source to pickup the changes. Since the
         # change could (theoretically) introduce parsing errors, we break the
         # loop if we find any.
+        break unless updated_source_file
+
         processed_source = ProcessedSource.from_file(file)
       end
 
       offenses
+    end
+
+    # Check whether a run created source identical to a previous run, which
+    # means that we definitely have an infinite loop.
+    def check_for_infinite_loop(processed_source, offenses)
+      checksum = processed_source.checksum
+
+      if @processed_sources.include?(checksum)
+        fail InfiniteCorrectionLoop.new(processed_source.path, offenses)
+      end
+
+      @processed_sources << checksum
     end
 
     def inspect_file(processed_source)
@@ -99,14 +133,18 @@ module RuboCop
       @mobilized_cop_classes[config.object_id] ||= begin
         cop_classes = Cop::Cop.all
 
-        if @options[:only]
-          validate_only_option
+        [:only, :except].each { |option| validate_cop_list(option) }
 
+        if @options[:only]
           cop_classes.select! do |c|
             @options[:only].include?(c.cop_name) || @options[:lint] && c.lint?
           end
         else
           filter_cop_classes(cop_classes, config)
+        end
+
+        if @options[:except]
+          cop_classes.reject! { |c| @options[:except].include?(c.cop_name) }
         end
 
         cop_classes
@@ -126,8 +164,10 @@ module RuboCop
       cop_classes.select!(&:lint?) if @options[:lint]
     end
 
-    def validate_only_option
-      @options[:only].each do |cop_to_run|
+    def validate_cop_list(option)
+      return unless @options[option]
+
+      @options[option].each do |cop_to_run|
         next unless Cop::Cop.all.none? { |c| c.cop_name == cop_to_run }
         fail ArgumentError, "Unrecognized cop name: #{cop_to_run}."
       end
